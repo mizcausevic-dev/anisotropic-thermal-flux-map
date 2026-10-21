@@ -1,0 +1,6 @@
+out/
+*.mp4
+*.webm
+agent-tools/
+.DS_Store
+Thumbs.db
