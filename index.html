@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Anisotropic Thermal Flux Map, a code-driven motion explainer (Metamaterials)</title>
+<meta name="description" content="A deterministic, 1,020-frame Canvas explainer of how an anisotropic conduction annulus steers heat flux around an object. 2D steady-state analytic model, qualitative, with isotherms plotted separately from flux and exterior disturbance compared across three cases.">
+<style>
+  :root{
+    --stage:#0B1019; --panel:#111827; --mat:#344257; --text:#D5DCE6; --dim:#8E9AAE;
+    --cyan:#00E5FF; --gold:#FFD166; --violet:#9D4EDD; --line:#243041;
+    --mono: ui-monospace, "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    --body: "Space Grotesk", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--stage);color:var(--text);font-family:var(--body);line-height:1.45}
+  body{background-image:radial-gradient(rgba(255,255,255,.045) 1.2px, transparent 1.2px);background-size:22px 22px}
+  a{color:var(--cyan)}
+  header{max-width:1280px;margin:0 auto;padding:22px 20px 10px}
+  header .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+  header h1{margin:4px 0 6px;font-size:clamp(22px,3vw,32px);font-weight:600;letter-spacing:-.01em}
+  header p{margin:0;color:var(--dim);max-width:900px}
+  main{max-width:1280px;margin:0 auto;padding:0 20px 60px}
+  .stage-wrap{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--stage);box-shadow:0 0 0 1px rgba(0,229,255,.06), 0 30px 80px rgba(0,0,0,.5)}
+  canvas#stage{display:block;width:100%;aspect-ratio:16/9;background:var(--stage)}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:12px 0 6px;font-family:var(--mono);font-size:13px}
+  .controls button,.controls label.toggle{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:7px 12px;font:inherit;cursor:pointer}
+  .controls button:hover{border-color:var(--cyan)}
+  .controls button:focus-visible,.controls input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .controls button[aria-pressed="true"]{border-color:var(--violet);color:#fff}
+  .controls .seg{padding:7px 10px}
+  .controls input[type=range]{flex:1 1 260px;min-width:200px;accent-color:var(--cyan)}
+  .controls input[type=number]{width:84px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit}
+  .controls .status{color:var(--dim);flex-basis:100%}
+  .controls .status[data-state="fail"]{color:#ff6b7a}
+  section{margin-top:34px}
+  h2{font-size:18px;margin:0 0 10px;letter-spacing:-.005em}
+  h2 small{font-family:var(--mono);font-weight:400;color:var(--dim);font-size:12px;margin-left:8px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+  .card{background:rgba(17,24,39,.72);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .card h3{margin:0 0 6px;font-size:14px;font-family:var(--mono);font-weight:500;color:var(--text)}
+  .card p,.card li{margin:0;color:var(--dim);font-size:14px}
+  .card ul{padding-left:18px;margin:6px 0 0}
+  .card .tag{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.08em;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--dim);margin-left:6px;vertical-align:middle}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:var(--mono);font-weight:500;font-size:12px;letter-spacing:.06em;color:var(--dim)}
+  td.mono{font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+  .sw{display:inline-block;width:11px;height:11px;border-radius:2px;vertical-align:-1px;margin-right:6px}
+  footer{max-width:1280px;margin:0 auto;padding:0 20px 40px;color:var(--dim);font-size:13px;font-family:var(--mono)}
+  @media (prefers-reduced-motion: reduce){
+    *,::before,::after{transition-duration:.001ms!important;animation-duration:.001ms!important;animation-iteration-count:1!important}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="kicker">Metamaterials · code-driven motion explainer</div>
+  <h1>Anisotropic Thermal Flux Map</h1>
+  <p>How a laminated conduction annulus turns conductivity into a tensor, steers heat flux circumferentially around an object, and reduces the exterior field disturbance. 34 s, 30 fps, 1,020 frames indexed 0–1019. Every frame is a pure function of its index; the physics is a 2D steady-state analytic conduction model, qualitative and labeled as such.</p>
+</header>
+
+<main>
+  <div class="stage-wrap">
+    <canvas id="stage" width="1280" height="720" role="img" aria-label="Animated schematic of heat flux steering through an anisotropic conduction annulus. Text transcript follows below."></canvas>
+  </div>
+
+  <div class="controls" role="group" aria-label="Playback controls">
+    <button id="play" aria-pressed="false" title="Space">Play</button>
+    <button id="stepB" title="Left arrow">−1</button>
+    <button id="stepF" title="Right arrow">+1</button>
+    <input id="scrub" type="range" min="0" max="1019" step="1" value="0" aria-label="Frame">
+    <input id="frameIn" type="number" min="0" max="1019" step="1" value="0" aria-label="Frame number">
+    <span id="tc" aria-live="off">f 0000 / 1019 · 0.00 s</span>
+    <button class="seg" data-seg="0" title="Key 1">A</button>
+    <button class="seg" data-seg="1" title="Key 2">B</button>
+    <button class="seg" data-seg="2" title="Key 3">C</button>
+    <button class="seg" data-seg="3" title="Key 4">D</button>
+    <button class="seg" data-seg="4" title="Key 5">E</button>
+    <label class="toggle"><input id="loop" type="checkbox" checked> loop</label>
+    <button id="export" title="Renders all 1,020 frames to a WebM preview in the browser">Preview render (WebM)</button>
+    <span class="status" id="status" aria-live="polite"></span>
+  </div>
+
+  <section aria-labelledby="t-transcript">
+    <h2 id="t-transcript">Frame map and transcript <small>what each segment shows, and the camera move</small></h2>
+    <table>
+      <thead><tr><th>Seg</th><th>Frames</th><th>Time</th><th>Content</th><th>Camera</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">A</td><td class="mono">0–149</td><td class="mono">0–5 s</td><td>Reveal of the assembly: conduction plate, hot-side input strip (gold overlay), cold-side output strip, patterned annulus of alternating concentric laminae, and the object region inside it.</td><td>Oblique three-quarter view resolves to plan view while pushing in toward the annulus.</td></tr>
+        <tr><td class="mono">B</td><td class="mono">150–299</td><td class="mono">5–10 s</td><td>Section wedge through the annulus. Local frame at a point P: radial r̂ across the laminae, circumferential θ̂ along them. Inner boundary R1, outer boundary R2. Conductivity tensor κ = diag(κ_r, κ_θ) in that frame; series stacking lowers κ_r, parallel paths raise κ_θ (qualitative).</td><td>Close-up on the wedge; everything outside it is dimmed.</td></tr>
+        <tr><td class="mono">C</td><td class="mono">300–509</td><td class="mono">10–17 s</td><td>Heat flux streamlines (cyan) through the plate while the shell anisotropy ratio κ_θ/κ_r sweeps from isotropic to high. Inputs (gold), outputs (neutral), and the κ control overlay (violet) stay visually separate. One pathway is tracked with a tracer.</td><td>Pull back to the full plate.</td></tr>
+        <tr><td class="mono">D</td><td class="mono">510–749</td><td class="mono">17–25 s</td><td>Graded (transformation-design) shell. Left panel: isotherms only. Right panel: flux only. Magnified inset at P shows −∇T normal to the isotherm and q rotated away from it. The angle shown is a model quantity, not a measurement.</td><td>Split view; inset ×7 (scale change labeled).</td></tr>
+        <tr><td class="mono">E</td><td class="mono">750–1019</td><td class="mono">25–34 s</td><td>Three cases side by side: bare object, homogeneous anisotropic shell (moderate ratio), graded shell. Dotted lines are the undisturbed reference isotherms. Chart of exterior dipole disturbance versus anisotropy ratio from the analytic model. Limits, losses, and the energy-accounting check stay on screen. Stable overview to the last frame.</td><td>Pull back to a stable system overview.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section aria-labelledby="t-model">
+    <h2 id="t-model">Model, evidence grades, and limits <small>what is verified, what is a model result, what is illustrative</small></h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Mechanism <span class="tag">verified, textbook</span></h3>
+        <p>Fourier conduction with a tensor conductivity: <span style="font-family:var(--mono)">q = −κ∇T</span>. When κ_r ≠ κ_θ, q is not parallel to −∇T, so flux is not normal to isotherms. In steady state with no sources, ∇·q = 0. Alternating concentric laminae of two materials give a low effective κ_r (series) and a high effective κ_θ (parallel). A graded annulus with κ_r→0 and κ_θ→∞ toward R1 (transformation design) leaves the exterior field undisturbed in the 2D steady model.</p>
+      </div>
+      <div class="card">
+        <h3>Model outputs <span class="tag">computed, not measured</span></h3>
+        <p>Fields are closed-form solutions of 2D steady conduction on an infinite plane with a uniform far-field gradient: core κ_c, shell with constant (κ_r, κ_θ) or the graded transformation profile, background κ0. The on-screen angle at P, the disturbance curve, and the energy residual are evaluated at runtime from these solutions. Axes are qualitative.</p>
+      </div>
+      <div class="card">
+        <h3>Illustrative parameters <span class="tag">not from the reference</span></h3>
+        <p>R2/R1 = 2, κ_c = 0.1 κ0, shell geometric-mean conductivity √(κ_r κ_θ) = κ0, 12 laminae, ratio sweep 1→60, comparison ratio 3. None of these describe a specific experiment or product. No dimensions, materials, temperatures, efficiencies, or certifications are stated.</p>
+      </div>
+      <div class="card">
+        <h3>Limits retained on screen <span class="tag">segment E</span></h3>
+        <ul>
+          <li>Steady state only. Transient response not shown.</li>
+          <li>Core sits at a uniform intermediate temperature in the ideal design. Not a cold core.</li>
+          <li>Thermal conduction only. No optical invisibility.</li>
+          <li>The ideal graded profile is not realizable; layered builds leave residual exterior distortion.</li>
+          <li>Not modeled: contact resistance, finite layer count, 3D leakage, convection, radiation.</li>
+          <li>The plate outline is a drawing window, not a modeled boundary. Schematic, not to scale.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="t-ref">
+    <h2 id="t-ref">Mechanism reference <small>supports the process, not a product geometry</small></h2>
+    <div class="card">
+      <p>Youming Zhang, Hongyi Xu, Baile Zhang, "Design, implementation, and extension of thermal invisibility cloaks," <em>AIP Advances</em> 5, 053402 (2015). <a href="https://pubs.aip.org/aip/adv/article/5/5/053402/977809/Design-implementation-and-extension-of-thermal" rel="noopener noreferrer">pubs.aip.org</a> · DOI <a href="https://doi.org/10.1063/1.4913996" rel="noopener noreferrer">10.1063/1.4913996</a>. Bibliographic metadata verified against Crossref. Camera moves, palette, cutaways, timing, and all numeric parameters here are original illustrative choices, not observations from that paper. This page is not a certified design, a simulation result for any device, or a claim about a commercial implementation.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="t-legend">
+    <h2 id="t-legend">Color grammar <small>explanatory overlays, not literal emission</small></h2>
+    <div class="card">
+      <p><span class="sw" style="background:#00E5FF"></span>cyan: heat flux, the transported quantity · <span class="sw" style="background:#FFD166"></span>gold: heat input, energy entering the plate · <span class="sw" style="background:#9D4EDD"></span>violet: control and state overlays (κ tensor, local frame, −∇T) · <span class="sw" style="background:#344257;border:1px solid #46586F"></span>neutral: physically plausible materials; thin light lines are isotherms.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="t-safe">
+    <h2 id="t-safe">Safeguards built into the file</h2>
+    <div class="grid">
+      <div class="card"><h3>Frame contract</h3><p>30 × 34 = 1,020 is asserted at load; segment table must be contiguous and cover 0–1019 or the script halts. <span style="font-family:var(--mono)">render(frame)</span> has no wall-clock dependency; <span style="font-family:var(--mono)">?frame=N</span> renders one static frame for headless capture.</p></div>
+      <div class="card"><h3>Motion safety</h3><p>No flashing, no position jitter. The fastest cyclic element is a dash offset on streamlines. With <span style="font-family:var(--mono)">prefers-reduced-motion</span>, autoplay is off and dashes hold still; scrubbing still works.</p></div>
+      <div class="card"><h3>Content safety</h3><p>Every on-screen statement is graded in the production notes. Model numbers are labeled as model outputs. No operational instructions for heaters, cryogenics, or any equipment.</p></div>
+      <div class="card"><h3>Page security</h3><p>Single file, zero network requests. Content-Security-Policy blocks all external loads, forms, and base-URI changes; referrer suppressed. Inline script is required by the single-file format and is the stated trade-off.</p></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div id="selfcheck">model self-check: pending</div>
+  <div>Keyboard: Space play/pause · ← → step · Home/End · 1–5 jump to segment. URL params: ?frame=N (static), ?autoplay=0, ?loop=0.</div>
+</footer>
+
+<script>
+(() => {
+'use strict';
+
+/* ---- 0. Frame contract (hard) ---- */
+const FPS = 30, DURATION_S = 34, TOTAL = FPS * DURATION_S, LAST = TOTAL - 1;
+if (TOTAL !== 1020) throw new Error(`Frame budget violated: ${TOTAL}`);
+
+const SEG = [
+  { id: 'A', s: 0,   e: 149,  t0: '0',  t1: '5',  title: 'Reveal: patterned conduction annulus' },
+  { id: 'B', s: 150, e: 299,  t0: '5',  t1: '10', title: 'Define: radial and circumferential directions' },
+  { id: 'C', s: 300, e: 509,  t0: '10', t1: '17', title: 'Contrast: qualitative conductivity' },
+  { id: 'D', s: 510, e: 749,  t0: '17', t1: '25', title: 'Isotherms plotted separately from flux' },
+  { id: 'E', s: 750, e: 1019, t0: '25', t1: '34', title: 'Compare: exterior field disturbance' },
+];
+SEG.reduce((p, s) => { if (s.s !== p) throw new Error('Segment gap at ' + s.id); return s.e + 1; }, 0);
+if (SEG[SEG.length - 1].e !== LAST) throw new Error('Segments do not cover the frame budget');
+
+/* ---- 1. Palette, fonts, stage ---- */
+const C = {
+  stage: '#0B1019', mat: '#344257', matDark: '#273343', matDarker: '#1C2634', matLight: '#46586F',
+  core: '#3B495E', cyan: '#00E5FF', gold: '#FFD166', violet: '#9D4EDD',
+  text: '#D5DCE6', dim: '#8E9AAE', iso: '#B8C4D6', sink: '#9AA7B8', line: '#2A3648',
+};
+const MONO = 'ui-monospace, "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, monospace';
+const BODY = '"Space Grotesk", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+const W = 1280, H = 720, TAU = Math.PI * 2;
+const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const canvas = document.getElementById('stage');
+const mainCtx = canvas.getContext('2d', { alpha: false });
+const offA = document.createElement('canvas'), offB = document.createElement('canvas'), offMix = document.createElement('canvas');
+let ctx = mainCtx;
+let DPR = 1;
+function fit() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  for (const c of [offA, offB, offMix]) { c.width = canvas.width; c.height = canvas.height; }
+}
+fit();
+
+/* ---- 2. Math helpers ---- */
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+const ease = (f, a, b) => smooth((f - a) / (b - a));
+const fmt = (n, d = 2) => Number(n).toFixed(d);
+
+/* ---- 3. Physics: 2D steady conduction, analytic ----
+   Dimensionless. Background κ0 = 1, far-field gradient magnitude G = 1 (hot side at x < 0).
+   Geometry: object (core) r < R1, shell R1 < r < R2, background r > R2.
+   Shell models:
+     'shell' : homogeneous anisotropic, constant κ_r, κ_θ. T = f(r) cos θ with f = A r^m + B r^-m, m = sqrt(κ_θ/κ_r).
+     'ideal' : graded transformation design, κ_r = κ0 (r−R1)/r, κ_θ = κ0 r/(r−R1); shell T = G' (r−R1) cos θ,
+               G' = G R2/(R2−R1); exterior exactly undisturbed; core uniform.
+   The radii ratio and κ_c are illustrative parameters, not values from the reference. */
+const R1 = 1, R2 = 2, K0 = 1, G = 1, KC = 0.1;
+const PLATE = { x0: -4.5, x1: 4.5, y0: -2.5, y1: 2.5 };
+const WINDOW = { x0: -4.05, x1: 4.05, y0: -2.5, y1: 2.5 }; // conduction window between the strips
+const N_LAYERS = 12;
+
+function solve4(M, b) {
+  const n = 4, A = M.map((r, i) => [...r, b[i]]);
+  for (let c = 0; c < n; c++) {
+    let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
+    [A[c], A[p]] = [A[p], A[c]];
+    const piv = A[c][c]; if (Math.abs(piv) < 1e-14) throw new Error('Singular system');
+    for (let r = 0; r < n; r++) if (r !== c) { const k = A[r][c] / piv; for (let j = c; j <= n; j++) A[r][j] -= k * A[c][j]; }
+  }
+  return A.map((r, i) => r[n] / r[i]);
+}
+const modelCache = new Map();
+function shellModel(ratio) { // κ_θ/κ_r = ratio, geometric mean √(κ_r κ_θ) = κ0
+  const key = 'shell:' + ratio.toFixed(6);
+  if (modelCache.has(key)) return modelCache.get(key);
+  const kr = K0 / Math.sqrt(ratio), kt = K0 * Math.sqrt(ratio), m = Math.sqrt(kt / kr);
+  const M = [
+    [R1, -Math.pow(R1, m), -Math.pow(R1, -m), 0],
+    [KC, -kr * m * Math.pow(R1, m - 1), kr * m * Math.pow(R1, -m - 1), 0],
+    [0, Math.pow(R2, m), Math.pow(R2, -m), -1 / R2],
+    [0, kr * m * Math.pow(R2, m - 1), -kr * m * Math.pow(R2, -m - 1), K0 / (R2 * R2)],
+  ];
+  const [Cc, A, B, D] = solve4(M, [0, 0, G * R2, K0 * G]);
+  const mdl = { type: 'shell', key, ratio, kr, kt, m, C: Cc, A, B, D };
+  modelCache.set(key, mdl); return mdl;
+}
+const IDEAL = { type: 'ideal', key: 'ideal', Gp: G * R2 / (R2 - R1), D: 0 };
+
+function fieldMath(mdl, x, y) { // T and q in the math frame (hot side at x > 0)
+  const r = Math.hypot(x, y), th = Math.atan2(y, x), c = Math.cos(th), s = Math.sin(th);
+  let T, qr, qt;
+  if (mdl.type === 'ideal') {
+    if (r < R1) { T = 0; qr = 0; qt = 0; }
+    else if (r < R2) { const Gp = mdl.Gp; T = Gp * (r - R1) * c; qr = -K0 * Gp * ((r - R1) / r) * c; qt = K0 * Gp * s; }
+    else { T = G * r * c; qr = -K0 * G * c; qt = K0 * G * s; }
+  } else {
+    let f, fp, kr, kt;
+    if (r < R1) { f = mdl.C * r; fp = mdl.C; kr = kt = KC; }
+    else if (r < R2) { const m = mdl.m, rm = Math.pow(r, m), rmm = Math.pow(r, -m); f = mdl.A * rm + mdl.B * rmm; fp = m * (mdl.A * rm - mdl.B * rmm) / r; kr = mdl.kr; kt = mdl.kt; }
+    else { f = G * r + mdl.D / r; fp = G - mdl.D / (r * r); kr = kt = K0; }
+    T = f * c; qr = -kr * fp * c; qt = r > 1e-9 ? kt * (f / r) * s : 0;
+  }
+  return { T, qx: qr * c - qt * s, qy: qr * s + qt * c };
+}
+// Physical frame: mirror x so the hot side sits on the left. κ is reflection-symmetric, so q_x flips sign.
+function field(mdl, x, y) { const f = fieldMath(mdl, -x, y); return { T: f.T, qx: -f.qx, qy: f.qy }; }
+function gradT(mdl, x, y, h = 1e-4) {
+  return [(field(mdl, x + h, y).T - field(mdl, x - h, y).T) / (2 * h), (field(mdl, x, y + h).T - field(mdl, x, y - h).T) / (2 * h)];
+}
+
+/* Isotherm levels: offset by half a step so no level sits at T = 0 (the ideal core is uniformly 0). */
+const LEVELS = []; for (let L = -4.25; L <= 4.26; L += 0.5) LEVELS.push(L);
+
+/* Marching squares → array of world-space segments [x1,y1,x2,y2]. */
+const MS = [[], [3, 0], [0, 1], [3, 1], [1, 2], null, [0, 2], [3, 2], [2, 3], [0, 2], null, [1, 2], [1, 3], [0, 1], [3, 0], []];
+function contours(mdl, bb, nx, ny, levels) {
+  const dx = (bb.x1 - bb.x0) / nx, dy = (bb.y1 - bb.y0) / ny, W1 = nx + 1;
+  const v = new Float64Array(W1 * (ny + 1));
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) v[j * W1 + i] = field(mdl, bb.x0 + i * dx, bb.y0 + j * dy).T;
+  const out = [];
+  const t = (p, q, L) => clamp((L - p) / (q - p), 0, 1);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const a = v[j * W1 + i], b = v[j * W1 + i + 1], c = v[(j + 1) * W1 + i + 1], d = v[(j + 1) * W1 + i];
+    const mn = Math.min(a, b, c, d), mx = Math.max(a, b, c, d);
+    const xa = bb.x0 + i * dx, ya = bb.y0 + j * dy, xb = xa + dx, yd = ya + dy;
+    for (const L of levels) {
+      if (L < mn || L > mx) continue;
+      const idx = (a > L ? 1 : 0) | (b > L ? 2 : 0) | (c > L ? 4 : 0) | (d > L ? 8 : 0);
+      const pt = e => e === 0 ? [xa + t(a, b, L) * dx, ya] : e === 1 ? [xb, ya + t(b, c, L) * dy] : e === 2 ? [xa + t(d, c, L) * dx, yd] : [xa, ya + t(a, d, L) * dy];
+      let pairs;
+      if (idx === 5 || idx === 10) { const hi = (a + b + c + d) / 4 > L; pairs = (idx === 5) === hi ? [[0, 1], [2, 3]] : [[3, 0], [1, 2]]; }
+      else { const e = MS[idx]; if (!e.length) continue; pairs = [e]; }
+      for (const [e1, e2] of pairs) { const p = pt(e1), q = pt(e2); out.push(p[0], p[1], q[0], q[1]); }
+    }
+  }
+  return out;
+}
+
+/* Flux streamlines: RK4 on the unit flux direction, seeded just right of the hot strip.
+   Seeds sit at half-spacing offsets so none lies on the y = 0 symmetry line: a direction-normalized
+   streamline there would draw a path straight through the near-zero-flux core and overstate transport. */
+const SEEDS = []; for (let k = 0; k < 14; k++) SEEDS.push(-2.33 + (k + 0.5) * (4.66 / 14));
+const slCache = new Map();
+function streamlines(mdl, seedYs = SEEDS) {
+  const key = mdl.key + '|' + seedYs.length;
+  if (slCache.has(key)) return slCache.get(key);
+  const h = 0.02, maxSteps = 900, lines = [];
+  const dir = (x, y) => { const q = field(mdl, x, y); const n = Math.hypot(q.qx, q.qy); return n < 1e-9 ? null : [q.qx / n, q.qy / n]; };
+  for (const sy of seedYs) {
+    let x = WINDOW.x0 + 0.01, y = sy; const pts = [x, y];
+    for (let i = 0; i < maxSteps; i++) {
+      const k1 = dir(x, y); if (!k1) break;
+      const k2 = dir(x + h / 2 * k1[0], y + h / 2 * k1[1]); if (!k2) break;
+      const k3 = dir(x + h / 2 * k2[0], y + h / 2 * k2[1]); if (!k3) break;
+      const k4 = dir(x + h * k3[0], y + h * k3[1]); if (!k4) break;
+      x += h / 6 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]); y += h / 6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]);
+      pts.push(x, y);
+      if (x > WINDOW.x1 || x < WINDOW.x0 || y > WINDOW.y1 || y < WINDOW.y0) break;
+    }
+    lines.push(pts);
+  }
+  if (slCache.size > 64) slCache.clear();
+  slCache.set(key, lines); return lines;
+}
+
+/* Energy accounting check: ∮ q·n ds around a closed rectangle should vanish (∇·q = 0). Quadrature residual only. */
+function closedLoopResidual(mdl, rect = { x0: -3.2, x1: 3.2, y0: -2.0, y1: 2.0 }, n = 600) {
+  let net = 0, gross = 0;
+  const side = (fx, fy, nx, ny, len) => { const ds = len / n; for (let i = 0; i < n; i++) { const s = (i + 0.5) / n; const q = field(mdl, fx(s), fy(s)); const qn = (q.qx * nx + q.qy * ny) * ds; net += qn; gross += Math.abs(qn); } };
+  side(s => rect.x1, s => lerp(rect.y0, rect.y1, s), 1, 0, rect.y1 - rect.y0);
+  side(s => rect.x0, s => lerp(rect.y0, rect.y1, s), -1, 0, rect.y1 - rect.y0);
+  side(s => lerp(rect.x0, rect.x1, s), s => rect.y1, 0, 1, rect.x1 - rect.x0);
+  side(s => lerp(rect.x0, rect.x1, s), s => rect.y0, 0, -1, rect.x1 - rect.x0);
+  return Math.abs(net) / (gross / 2);
+}
+
+/* Disturbance curve for the chart: relative exterior dipole amplitude |D| / (G R1²) versus ratio. */
+const CURVE = []; for (let i = 0; i <= 60; i++) { const a = Math.pow(10, 2 * i / 60); CURVE.push([a, Math.abs(shellModel(a).D) / (G * R1 * R1)]); }
+const RATIO_MID = 3, RATIO_HI = 60;
+
+/* Self-check: the isotropic shell must reproduce the two-region disc result D = (κ0−κc)/(κ0+κc)·R1². */
+(function selfCheck() {
+  const el = document.getElementById('selfcheck');
+  try {
+    const m1 = shellModel(1); const expect = (K0 - KC) / (K0 + KC) * R1 * R1;
+    const ok1 = Math.abs(m1.D - expect) < 1e-9;
+    const fo = field(IDEAL, 3, 0.4), fe = { T: -G * 3, qx: K0 * G, qy: 0 };
+    const ok2 = Math.abs(fo.T - fe.T) < 1e-12 && Math.abs(fo.qx - fe.qx) < 1e-12 && Math.abs(fo.qy) < 1e-12;
+    const res = closedLoopResidual(shellModel(RATIO_MID));
+    const ok3 = res < 1e-3;
+    const ok = ok1 && ok2 && ok3;
+    el.textContent = `model self-check: ${ok ? 'pass' : 'FAIL'} · isotropic-shell dipole ${ok1 ? '✓' : '✗'} · ideal exterior field ${ok2 ? '✓' : '✗'} · closed-loop flux residual ${res.toExponential(1)} ${ok3 ? '✓' : '✗'}`;
+    if (!ok) el.style.color = '#ff6b7a';
+  } catch (e) { el.textContent = 'model self-check: FAIL (' + e.message + ')'; el.style.color = '#ff6b7a'; }
+})();
+
+/* ---- 4. Views (camera) and drawing primitives ---- */
+function makeView(rect, cam) {
+  const sx = rect.x + rect.w / 2, sy = rect.y + rect.h / 2;
+  const shear = cam.shear || 0, squash = cam.squash == null ? 1 : cam.squash;
+  const v = {
+    rect, cam,
+    begin() { ctx.save(); ctx.beginPath(); ctx.rect(rect.x, rect.y, rect.w, rect.h); ctx.clip(); ctx.translate(sx, sy); ctx.transform(1, 0, shear, squash, 0, 0); ctx.scale(cam.zoom, -cam.zoom); ctx.translate(-cam.cx, -cam.cy); },
+    end() { ctx.restore(); },
+    P(x, y) { const u = cam.zoom * (x - cam.cx), w = -cam.zoom * (y - cam.cy); return [sx + u + shear * w, sy + squash * w]; },
+    U(X, Y) { const w = (Y - sy) / squash, u = (X - sx) - shear * w; return [cam.cx + u / cam.zoom, cam.cy - w / cam.zoom]; },
+    bbox() { const cs = [v.U(rect.x, rect.y), v.U(rect.x + rect.w, rect.y), v.U(rect.x, rect.y + rect.h), v.U(rect.x + rect.w, rect.y + rect.h)]; return { x0: Math.min(...cs.map(c => c[0])), x1: Math.max(...cs.map(c => c[0])), y0: Math.min(...cs.map(c => c[1])), y1: Math.max(...cs.map(c => c[1])) }; },
+  };
+  return v;
+}
+function px() { ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+function strokePx(w, color, dash, offset) { ctx.save(); px(); ctx.lineWidth = w; ctx.strokeStyle = color; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.setLineDash(dash || []); ctx.lineDashOffset = offset || 0; ctx.stroke(); ctx.restore(); }
+function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function text(x, y, str, o = {}) {
+  ctx.save(); px();
+  const size = o.size || 13;
+  ctx.font = `${o.weight || 400} ${size}px ${o.font || MONO}`;
+  ctx.textAlign = o.align || 'left'; ctx.textBaseline = o.baseline || 'middle';
+  if (o.alpha != null) ctx.globalAlpha *= clamp(o.alpha, 0, 1);
+  if (o.bg) {
+    const w = ctx.measureText(str).width, padX = 7, h = size + 9;
+    const bx = o.align === 'right' ? x - w - padX : o.align === 'center' ? x - w / 2 - padX : x - padX;
+    ctx.fillStyle = o.bg; roundRect(bx, y - h / 2, w + 2 * padX, h, 4); ctx.fill();
+  }
+  ctx.fillStyle = o.color || C.text; ctx.fillText(str, x, y); ctx.restore();
+}
+function textWidth(str, size = 13, font = MONO, weight = 400) { ctx.save(); px(); ctx.font = `${weight} ${size}px ${font}`; const w = ctx.measureText(str).width; ctx.restore(); return w; }
+function arrow(x0, y0, x1, y1, o = {}) {
+  ctx.save(); px();
+  const w = o.width || 2, col = o.color || C.text, hs = o.head || 9, ang = Math.atan2(y1 - y0, x1 - x0);
+  if (o.alpha != null) ctx.globalAlpha *= clamp(o.alpha, 0, 1);
+  ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = w; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - hs * 0.6 * Math.cos(ang), y1 - hs * 0.6 * Math.sin(ang)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - hs * Math.cos(ang - 0.42), y1 - hs * Math.sin(ang - 0.42)); ctx.lineTo(x1 - hs * Math.cos(ang + 0.42), y1 - hs * Math.sin(ang + 0.42)); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function callout(ax, ay, tx, ty, str, o = {}) { // feature dot at (ax,ay), elbow leader to text at (tx,ty)
+  const a = o.alpha == null ? 1 : clamp(o.alpha, 0, 1); if (a <= 0) return;
+  const col = o.color || C.text, dir = tx >= ax ? 1 : -1;
+  ctx.save(); px(); ctx.globalAlpha *= a;
+  ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(ax, ay, 3, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(tx - dir * 10, ty); ctx.lineTo(tx - dir * 2, ty); ctx.stroke();
+  ctx.restore();
+  text(tx, ty, str, { color: col, size: o.size || 12.5, align: dir > 0 ? 'left' : 'right', bg: 'rgba(11,16,25,0.82)', alpha: a });
+}
+function polyFill(pts, color, alpha = 1) { ctx.save(); px(); ctx.globalAlpha *= alpha; ctx.fillStyle = color; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); ctx.fill(); ctx.restore(); }
+
+/* Dot grid texture for the stage, cached as a pattern. */
+let dotPattern = null;
+function stageBackground() {
+  px(); ctx.fillStyle = C.stage; ctx.fillRect(0, 0, W, H);
+  if (!dotPattern) { const pc = document.createElement('canvas'); pc.width = pc.height = 22; const p = pc.getContext('2d'); p.fillStyle = 'rgba(255,255,255,0.055)'; p.beginPath(); p.arc(11, 11, 1.2, 0, TAU); p.fill(); dotPattern = ctx.createPattern(pc, 'repeat'); }
+  ctx.fillStyle = dotPattern; ctx.fillRect(0, 0, W, H);
+}
+
+/* ---- 5. Assembly drawing (materials) ---- */
+function drawAssembly(view, o = {}) {
+  const alpha = o.alpha == null ? 1 : o.alpha, tilt = o.tilt || 0, layers = o.layers == null ? N_LAYERS : o.layers, coreA = o.core == null ? 1 : o.core, strips = o.strips == null ? 1 : o.strips;
+  if (alpha <= 0) return;
+  if (tilt > 0.001) { // slab side faces, screen space
+    const th = 28 * tilt;
+    const p00 = view.P(PLATE.x0, PLATE.y0), p10 = view.P(PLATE.x1, PLATE.y0), p11 = view.P(PLATE.x1, PLATE.y1);
+    polyFill([p00, p10, [p10[0], p10[1] + th], [p00[0], p00[1] + th]], C.matDarker, alpha);
+    polyFill([p10, p11, [p11[0], p11[1] + th], [p10[0], p10[1] + th]], '#151e2a', alpha);
+  }
+  view.begin();
+  ctx.globalAlpha *= alpha;
+  ctx.fillStyle = C.mat; ctx.fillRect(PLATE.x0, PLATE.y0, PLATE.x1 - PLATE.x0, PLATE.y1 - PLATE.y0);
+  ctx.beginPath(); ctx.rect(PLATE.x0, PLATE.y0, PLATE.x1 - PLATE.x0, PLATE.y1 - PLATE.y0); strokePx(1, 'rgba(255,255,255,0.10)');
+  if (strips > 0) {
+    ctx.save(); ctx.globalAlpha *= strips;
+    ctx.fillStyle = C.gold; ctx.globalAlpha *= 0.82; ctx.fillRect(-4.42, -2.3, 0.34, 4.6);
+    ctx.globalAlpha /= 0.82; ctx.fillStyle = C.sink; ctx.globalAlpha *= 0.75; ctx.fillRect(4.08, -2.3, 0.34, 4.6);
+    ctx.restore();
+  }
+  const lw = (R2 - R1) / N_LAYERS, n = Math.floor(clamp(layers, 0, N_LAYERS));
+  for (let k = 0; k < n; k++) { const ro = R2 - k * lw; ctx.fillStyle = k % 2 ? C.matLight : C.matDark; ctx.beginPath(); ctx.arc(0, 0, ro, 0, TAU); ctx.fill(); }
+  if (n > 0) { const ri = R2 - n * lw; ctx.fillStyle = C.mat; ctx.beginPath(); ctx.arc(0, 0, ri, 0, TAU); ctx.fill(); }
+  if (n > 0) { ctx.beginPath(); ctx.arc(0, 0, R2, 0, TAU); strokePx(1, 'rgba(255,255,255,0.16)'); }
+  if (coreA > 0 && (n >= N_LAYERS || o.noShell)) {
+    ctx.save(); ctx.globalAlpha *= coreA;
+    ctx.fillStyle = C.core; ctx.beginPath(); ctx.arc(0, 0, R1, 0, TAU); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.arc(0, 0, R1, 0, TAU); ctx.clip();
+    ctx.beginPath(); for (let s = -2.4; s <= 2.4; s += 0.16) { ctx.moveTo(s - 1.3, -1.3); ctx.lineTo(s + 1.3, 1.3); }
+    strokePx(1, 'rgba(255,255,255,0.11)'); ctx.restore();
+    ctx.beginPath(); ctx.arc(0, 0, R1, 0, TAU); strokePx(1, 'rgba(255,255,255,0.22)');
+    ctx.restore();
+  }
+  view.end();
+}
+function drawIsotherms(view, mdl, o = {}) {
+  const alpha = o.alpha == null ? 1 : o.alpha; if (alpha <= 0) return;
+  const bb0 = view.bbox();
+  const bb = { x0: Math.max(bb0.x0, WINDOW.x0), x1: Math.min(bb0.x1, WINDOW.x1), y0: Math.max(bb0.y0, WINDOW.y0), y1: Math.min(bb0.y1, WINDOW.y1) };
+  if (bb.x1 <= bb.x0 || bb.y1 <= bb.y0) return;
+  const cell = o.cell || 5;
+  const nx = clamp(Math.round((bb.x1 - bb.x0) * view.cam.zoom / cell), 24, 260), ny = clamp(Math.round((bb.y1 - bb.y0) * view.cam.zoom / cell), 24, 200);
+  const segs = contours(mdl, bb, nx, ny, o.levels || LEVELS);
+  const sweep = o.sweepX == null ? Infinity : o.sweepX;
+  view.begin(); ctx.globalAlpha *= alpha; ctx.beginPath();
+  for (let i = 0; i < segs.length; i += 4) { if ((segs[i] + segs[i + 2]) / 2 > sweep) continue; ctx.moveTo(segs[i], segs[i + 1]); ctx.lineTo(segs[i + 2], segs[i + 3]); }
+  strokePx(o.width || 1.3, o.color || C.iso);
+  view.end();
+}
+function drawReferenceIsotherms(view, o = {}) { // undisturbed field T = −G x → vertical lines at x = −L
+  const alpha = o.alpha == null ? 1 : o.alpha; if (alpha <= 0) return;
+  view.begin(); ctx.globalAlpha *= alpha; ctx.beginPath();
+  for (const L of LEVELS) { const x = -L / G; if (x < WINDOW.x0 || x > WINDOW.x1) continue; ctx.moveTo(x, WINDOW.y0); ctx.lineTo(x, WINDOW.y1); }
+  strokePx(1, 'rgba(184,196,214,0.55)', [2, 5]); view.end();
+}
+function drawFlux(view, mdl, f, o = {}) {
+  const alpha = o.alpha == null ? 1 : o.alpha; if (alpha <= 0) return;
+  const lines = streamlines(mdl), frac = o.frac == null ? 1 : clamp(o.frac, 0, 1);
+  const offset = REDUCED ? 0 : -((f * 1.25) % 16);
+  view.begin(); ctx.globalAlpha *= alpha;
+  lines.forEach((pts, li) => {
+    const n = Math.max(2, Math.floor((pts.length / 2) * frac));
+    ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (let i = 1; i < n; i++) ctx.lineTo(pts[2 * i], pts[2 * i + 1]);
+    const hi = o.highlight === li;
+    strokePx(hi ? 2.6 : (o.width || 1.5), hi ? C.cyan : (o.color || 'rgba(0,229,255,0.72)'), o.dash === false ? [] : [7, 9], offset);
+  });
+  view.end();
+}
+function pointAlong(pts, s) { // s ∈ [0,1] by arc length
+  let total = 0; const cum = [0];
+  for (let i = 1; i < pts.length / 2; i++) { total += Math.hypot(pts[2 * i] - pts[2 * i - 2], pts[2 * i + 1] - pts[2 * i - 1]); cum.push(total); }
+  const target = s * total; let i = 1; while (i < cum.length - 1 && cum[i] < target) i++;
+  const t = cum[i] === cum[i - 1] ? 0 : (target - cum[i - 1]) / (cum[i] - cum[i - 1]);
+  return [lerp(pts[2 * i - 2], pts[2 * i], t), lerp(pts[2 * i - 1], pts[2 * i + 1], t)];
+}
+
+/* ---- 6. Captions (global, drawn over scenes) ---- */
+const CAPTIONS = [
+  [0, 62, 'A conduction plate carries heat from a hot side (input) to a cold sink (output).'],
+  [62, 149, 'Around an object sits an annulus of alternating laminae, patterned concentrically.'],
+  [150, 232, 'Section view. Two local directions matter: radial r̂ across the laminae, circumferential θ̂ along them.'],
+  [232, 299, 'Series stacking lowers κ_r; parallel paths raise κ_θ. Conductivity becomes a tensor, not a number.'],
+  [300, 374, 'Isotropic shell (κ_r = κ_θ = κ0): the object alone sets the flux map.'],
+  [374, 470, 'Raising κ_θ/κ_r steers flux circumferentially around the object.'],
+  [470, 509, 'Causal chain: input → plate → annulus (steered by κ) → plate → output.'],
+  [510, 600, 'Graded design. Isotherms (left) and heat flux (right), plotted separately.'],
+  [600, 700, 'At P: −∇T is normal to the isotherm. q is not. The κ tensor rotates flux toward θ̂.'],
+  [700, 749, 'Flux need not be normal to isotherms in anisotropic media.'],
+  [750, 846, 'Exterior isotherms for three cases. Dotted lines: undisturbed reference field.'],
+  [846, 940, 'A bare object bends the exterior field. The anisotropic shell suppresses it; the graded design removes it in this model.'],
+  [940, 1019, 'Model result, not a measurement. Real builds retain residual disturbance and losses.'],
+];
+function drawCaption(f) {
+  for (const [s, e, str] of CAPTIONS) {
+    if (f < s || f > e) continue;
+    const a = Math.min(ease(f, s, s + 9), e >= LAST ? 1 : 1 - ease(f, e - 8, e + 1)); // final caption holds to the last frame
+    if (a <= 0) continue;
+    text(W / 2, 641, str, { font: BODY, size: 18, align: 'center', bg: 'rgba(11,16,25,0.84)', alpha: a, color: C.text });
+  }
+}
+
+/* ---- 7. HUD ---- */
+function segIndex(f) { for (let i = SEG.length - 1; i >= 0; i--) if (f >= SEG[i].s) return i; return 0; }
+function hud(f) {
+  px();
+  // Legibility bands: scenes may extend under the HUD during pushes, so fade the stage back in behind the text.
+  const gTop = ctx.createLinearGradient(0, 0, 0, 104); gTop.addColorStop(0, 'rgba(11,16,25,0.92)'); gTop.addColorStop(1, 'rgba(11,16,25,0)');
+  ctx.fillStyle = gTop; ctx.fillRect(0, 0, W, 104);
+  const gBot = ctx.createLinearGradient(0, 622, 0, H); gBot.addColorStop(0, 'rgba(11,16,25,0)'); gBot.addColorStop(0.3, 'rgba(11,16,25,0.85)'); gBot.addColorStop(1, 'rgba(11,16,25,0.96)');
+  ctx.fillStyle = gBot; ctx.fillRect(0, 622, W, H - 622);
+  text(28, 30, 'METAMATERIALS', { size: 11.5, color: C.dim });
+  text(28, 53, 'Anisotropic Thermal Flux Map', { font: BODY, size: 22, weight: 600, color: C.text });
+  text(28, 76, 'code-driven explainer · 1,020 frames · 30 fps · 34 s', { size: 11.5, color: C.dim });
+  const i = segIndex(f), s = SEG[i];
+  text(W - 28, 28, `SEG ${s.id} · frames ${s.s}–${s.e} · ${s.t0}–${s.t1} s`, { size: 11.5, color: C.dim, align: 'right' });
+  text(W - 28, 50, s.title, { font: BODY, size: 15, weight: 500, color: C.text, align: 'right' });
+  // legend
+  const items = [[C.cyan, 'heat flux'], [C.gold, 'heat input'], [C.violet, 'control / state'], [C.matLight, 'materials'], [C.iso, 'isotherm']];
+  let x = W - 28;
+  for (let k = items.length - 1; k >= 0; k--) {
+    const [col, lab] = items[k]; const w = textWidth(lab, 11);
+    text(x, 78, lab, { size: 11, color: C.dim, align: 'right' }); x -= w + 8;
+    ctx.fillStyle = col; if (k === 4) { ctx.fillRect(x - 10, 77, 10, 1.5); } else { ctx.fillRect(x - 10, 73, 10, 10); } x -= 20;
+  }
+  // progress
+  const bx = 28, bw = W - 56, by = 676;
+  ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(bx, by, bw, 3);
+  for (const sg of SEG) { const x0 = bx + bw * sg.s / TOTAL; ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x0, by - 3, 1, 9); text(x0 + 4, by - 9, sg.id, { size: 10, color: C.dim }); }
+  ctx.fillStyle = C.cyan; ctx.fillRect(bx, by, bw * (f + 1) / TOTAL, 3);
+  const phx = bx + bw * (f + 0.5) / TOTAL; ctx.fillStyle = C.cyan; ctx.beginPath(); ctx.arc(phx, by + 1.5, 4, 0, TAU); ctx.fill();
+  text(28, 702, 'SCHEMATIC · NOT TO SCALE · 2D STEADY-STATE CONDUCTION MODEL · QUALITATIVE · DASH MOTION = DIRECTION, NOT SPEED', { size: 10.5, color: C.dim });
+  text(W - 28, 702, `f ${String(f).padStart(4, '0')} / ${LAST} · t ${fmt(f / FPS)} s · ${FPS} fps`, { size: 11.5, color: C.text, align: 'right' });
+  drawCaption(f);
+}
+
+/* ---- 8. Scenes ---- */
+const FULL = { x: 0, y: 0, w: W, h: H };
+const CARD_BG = 'rgba(11,16,25,0.86)';
+function card(x, y, w, h, color, alpha = 1) { if (alpha <= 0) return; ctx.save(); px(); ctx.globalAlpha *= alpha; ctx.fillStyle = CARD_BG; roundRect(x, y, w, h, 8); ctx.fill(); ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.stroke(); ctx.fillStyle = color; ctx.fillRect(x, y + 10, 3, h - 20); ctx.restore(); }
+
+/* Segment A: reveal, three-quarter push to plan view */
+function camA(f) {
+  const tilt = 1 - ease(f, 48, 149);
+  return { cx: 0, cy: lerp(-0.15, 0, ease(f, 48, 149)), zoom: lerp(84, 104, ease(f, 48, 149)), shear: 0.42 * tilt, squash: lerp(1, 0.58, tilt), tilt };
+}
+function drawA(f) {
+  const cam = camA(f), v = makeView(FULL, cam);
+  const aPlate = ease(f, 0, 28), aStrips = ease(f, 18, 46);
+  const layers = N_LAYERS * ease(f, 40, 92), core = ease(f, 88, 108);
+  drawAssembly(v, { alpha: aPlate, tilt: cam.tilt, strips: aStrips, layers, core });
+  if (cam.tilt > 0.02) text(28, 98, `three-quarter view → plan view · push-in ×${fmt(cam.zoom / 84, 2)}`, { size: 11, color: C.dim, alpha: cam.tilt });
+  // labels
+  const aIn = ease(f, 30, 48);
+  const hp = v.P(-4.25, 1.9), cp = v.P(4.25, 1.9);
+  callout(hp[0], hp[1], hp[0] + 22, hp[1] - 40, 'heat input (hot side)', { color: C.gold, alpha: aIn });
+  callout(cp[0], cp[1], cp[0] - 22, cp[1] - 40, 'heat output (cold sink)', { color: C.sink, alpha: aIn });
+  const aAnn = ease(f, 72, 90);
+  const ap = v.P(R2 * Math.cos(0.35), R2 * Math.sin(0.35));
+  callout(ap[0], ap[1], ap[0] + 60, ap[1] - 36, 'patterned annulus: alternating laminae', { color: C.text, alpha: aAnn });
+  const aCore = ease(f, 104, 122);
+  const kp = v.P(-R1 * 0.55, -R1 * 0.5);
+  callout(kp[0], kp[1], kp[0] - 70, kp[1] + 62, 'object region (κ_c ≠ κ0)', { color: C.text, alpha: aCore });
+  const aBg = ease(f, 118, 136);
+  const bp = v.P(-3.3, -1.7); // lower-left quadrant keeps clear of the R1/R2 callouts on the lower right
+  callout(bp[0], bp[1], bp[0] + 40, bp[1] + 28, 'background plate (κ0)', { color: C.text, alpha: aBg });
+  const aR = ease(f, 128, 146);
+  const r1p = v.P(R1 * Math.cos(-0.6), R1 * Math.sin(-0.6)), r2p = v.P(R2 * Math.cos(-0.6), R2 * Math.sin(-0.6));
+  callout(r1p[0], r1p[1], r1p[0] + 34, r1p[1] + 30, 'R1', { color: C.violet, alpha: aR });
+  callout(r2p[0], r2p[1], r2p[0] + 48, r2p[1] + 58, 'R2', { color: C.violet, alpha: aR });
+}
+
+/* Segment B: section close-up, local frame, tensor */
+const PB = [1.5 * Math.cos(0.82), 1.5 * Math.sin(0.82)]; // sample point P in the shell
+// Camera holds through the 14-frame dissolve window (150±7) so both scenes register pixel-exactly, then pushes in.
+function camB(f) { const e = ease(f, 158, 212); return { cx: lerp(0, 0.98, e), cy: lerp(0, 0.98, e), zoom: lerp(104, 400, e) }; }
+function drawB(f) {
+  const cam = camB(f), v = makeView(FULL, cam);
+  drawAssembly(v, {});
+  // section wedge: dim everything outside
+  const a0 = 0.38, a1 = 1.26, r0 = 0.5, r1 = 2.75, aW = ease(f, 156, 176);
+  if (aW > 0) {
+    v.begin(); ctx.globalAlpha *= aW * 0.66; ctx.fillStyle = C.stage; ctx.beginPath();
+    const bb = v.bbox(); ctx.rect(bb.x0 - 1, bb.y0 - 1, bb.x1 - bb.x0 + 2, bb.y1 - bb.y0 + 2);
+    ctx.moveTo(r0 * Math.cos(a0), r0 * Math.sin(a0)); ctx.arc(0, 0, r1, a0, a1); ctx.arc(0, 0, r0, a1, a0, true); ctx.closePath();
+    ctx.fill('evenodd');
+    ctx.globalAlpha /= 0.66;
+    ctx.beginPath(); ctx.moveTo(r0 * Math.cos(a0), r0 * Math.sin(a0)); ctx.lineTo(r1 * Math.cos(a0), r1 * Math.sin(a0)); ctx.moveTo(r0 * Math.cos(a1), r0 * Math.sin(a1)); ctx.lineTo(r1 * Math.cos(a1), r1 * Math.sin(a1));
+    strokePx(1, 'rgba(213,220,230,0.6)', [5, 5]);
+    v.end();
+    const sp = v.P(1.3 * Math.cos(a1), 1.3 * Math.sin(a1));
+    text(sp[0] - 12, sp[1] - 12, 'section A–A (wedge)', { size: 11, color: C.dim, align: 'right', alpha: aW });
+  }
+  // local frame at P
+  const p = v.P(PB[0], PB[1]); const th = Math.atan2(PB[1], PB[0]);
+  const er = [Math.cos(th), Math.sin(th)], et = [-Math.sin(th), Math.cos(th)];
+  const aR = ease(f, 168, 186), aT = ease(f, 204, 222), L = 0.34;
+  if (aR > 0) { const q = v.P(PB[0] + L * er[0] * aR, PB[1] + L * er[1] * aR); arrow(p[0], p[1], q[0], q[1], { color: C.violet, width: 2.4, alpha: aR }); text(q[0] + 14, q[1] - 12, 'r̂  radial · across laminae', { color: C.violet, bg: CARD_BG, alpha: ease(f, 180, 192) }); }
+  if (aT > 0) { const q = v.P(PB[0] + L * et[0] * aT, PB[1] + L * et[1] * aT); arrow(p[0], p[1], q[0], q[1], { color: C.violet, width: 2.4, alpha: aT }); text(q[0] - 14, q[1] - 14, 'θ̂  circumferential · along laminae', { color: C.violet, bg: CARD_BG, align: 'right', alpha: ease(f, 216, 228) }); }
+  ctx.save(); px(); ctx.globalAlpha *= ease(f, 164, 172); ctx.fillStyle = C.violet; ctx.beginPath(); ctx.arc(p[0], p[1], 4, 0, TAU); ctx.fill(); ctx.restore();
+  text(p[0] + 9, p[1] + 12, 'P', { color: C.violet, size: 12, alpha: ease(f, 164, 174) });
+  // boundaries
+  const aB = ease(f, 232, 250), ang = 0.52;
+  const b1 = v.P(R1 * Math.cos(ang), R1 * Math.sin(ang)), b2 = v.P(R2 * Math.cos(ang), R2 * Math.sin(ang));
+  callout(b1[0], b1[1], b1[0] + 36, b1[1] + 36, 'R1 · inner boundary (object side)', { color: C.violet, alpha: aB });
+  callout(b2[0], b2[1], b2[0] + 36, b2[1] + 30, 'R2 · outer boundary (plate side)', { color: C.violet, alpha: aB });
+  const lp = v.P(1.75 * Math.cos(1.05), 1.75 * Math.sin(1.05));
+  callout(lp[0], lp[1], lp[0] - 40, lp[1] - 46, 'laminae: two neutral materials, alternating', { color: C.text, alpha: ease(f, 240, 256) });
+  const cp = v.P(0.72 * Math.cos(0.75), 0.72 * Math.sin(0.75));
+  callout(cp[0], cp[1], cp[0] - 60, cp[1] - 30, 'object', { color: C.text, alpha: ease(f, 246, 262) });
+  // tensor card
+  const aK = ease(f, 254, 272);
+  if (aK > 0) {
+    const x = 880, y = 426, w = 372, h = 176; card(x, y, w, h, C.violet, aK);
+    text(x + 18, y + 24, 'CONDUCTIVITY TENSOR · in the (r̂, θ̂) frame', { size: 11.5, color: C.violet, alpha: aK });
+    text(x + 18, y + 58, 'κ = [ κ_r   0  ]', { size: 16, color: C.text, alpha: aK });
+    text(x + 18, y + 80, '    [  0   κ_θ ]', { size: 16, color: C.text, alpha: aK });
+    text(x + 18, y + 112, 'κ_r : heat crosses laminae in series  → low', { size: 12, color: C.text, alpha: ease(f, 266, 282) });
+    text(x + 18, y + 134, 'κ_θ : heat runs along laminae in parallel → high', { size: 12, color: C.text, alpha: ease(f, 276, 292) });
+    text(x + 18, y + 158, 'qualitative · effective-medium picture · no units', { size: 10.5, color: C.dim, alpha: aK });
+  }
+}
+
+/* Segment C: flux map while the anisotropy ratio sweeps */
+function ratioAt(f) { if (f < 374) return 1; if (f > 470) return RATIO_HI; return Math.pow(10, Math.log10(RATIO_HI) * ease(f, 374, 470)); }
+function camC(f) { const e = ease(f, 308, 352); return { cx: lerp(0.98, 0.9, e), cy: lerp(0.98, 0, e), zoom: lerp(400, 100, e) }; }
+function drawC(f) {
+  const cam = camC(f), v = makeView(FULL, cam), ratio = ratioAt(f), mdl = shellModel(ratio);
+  drawAssembly(v, {});
+  const aF = ease(f, 318, 346);
+  drawFlux(v, mdl, f, { alpha: aF, highlight: 9 });
+  // tracer on the highlighted pathway (seed index 9, above the object)
+  if (aF > 0) {
+    const pts = streamlines(mdl)[9]; const s = REDUCED ? 0.55 : ((f - 300) / 84) % 1; const tp = pointAlong(pts, s); const sp = v.P(tp[0], tp[1]);
+    ctx.save(); px(); ctx.globalAlpha *= aF; ctx.fillStyle = C.cyan; ctx.shadowColor = C.cyan; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(sp[0], sp[1], 5, 0, TAU); ctx.fill(); ctx.restore();
+  }
+  // inputs / outputs
+  const aIO = ease(f, 326, 350);
+  if (aIO > 0) {
+    for (let k = -2; k <= 2; k++) { const y = k * 0.9; const a = v.P(-4.02, y), b = v.P(-3.55, y); arrow(a[0], a[1], b[0], b[1], { color: C.gold, width: 2, alpha: aIO }); const c2 = v.P(3.55, y), d = v.P(4.02, y); arrow(c2[0], c2[1], d[0], d[1], { color: C.sink, width: 2, alpha: aIO }); }
+    const ip = v.P(-4.25, 2.3), op = v.P(4.25, 2.3);
+    text(ip[0], ip[1] - 16, 'INPUT · heat Q_in', { color: C.gold, size: 12, align: 'left', bg: CARD_BG, alpha: aIO });
+    text(op[0], op[1] - 16, 'OUTPUT · heat Q_out', { color: C.sink, size: 12, align: 'right', bg: CARD_BG, alpha: aIO });
+  }
+  // control card
+  const aK = ease(f, 340, 360);
+  if (aK > 0) {
+    const x = 1004, y = 112, w = 248, h = 232; card(x, y, w, h, C.violet, aK);
+    text(x + 18, y + 24, 'CONTROL · shell κ tensor', { size: 11.5, color: C.violet, alpha: aK });
+    const base = y + 118, hmax = 68;
+    const lr = Math.log10(mdl.kr), lt = Math.log10(mdl.kt), span = Math.log10(RATIO_HI) / 2 + 0.2;
+    const barH = val => (val / span) * (hmax / 2);
+    ctx.save(); px(); ctx.globalAlpha *= aK;
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(x + 18, base - hmax / 2, 140, 1);
+    ctx.fillStyle = C.violet; const hr = barH(lr), ht = barH(lt);
+    ctx.fillRect(x + 36, base - hmax / 2 - Math.max(hr, 0), 34, Math.abs(hr) || 1);
+    ctx.fillRect(x + 104, base - hmax / 2 - Math.max(ht, 0), 34, Math.abs(ht) || 1);
+    ctx.restore();
+    text(x + 53, base + 18, 'κ_r', { size: 12, color: C.text, align: 'center', alpha: aK });
+    text(x + 121, base + 18, 'κ_θ', { size: 12, color: C.text, align: 'center', alpha: aK });
+    text(x + 164, base - hmax / 2, 'κ0', { size: 10.5, color: C.dim, alpha: aK });
+    text(x + 18, y + 170, 'ratio κ_θ/κ_r', { size: 11.5, color: C.dim, alpha: aK });
+    text(x + 130, y + 170, ratio < 1.01 ? 'isotropic (1)' : `${fmt(ratio, 0)} ×`, { size: 16, color: C.text, alpha: aK });
+    text(x + 18, y + 192, '√(κ_r κ_θ) = κ0 · model input', { size: 10.5, color: C.dim, alpha: aK });
+    text(x + 18, y + 212, 'bars: log scale · qualitative', { size: 10.5, color: C.dim, alpha: aK });
+  }
+  // causal pathway markers
+  const m1 = v.P(-3.3, 0.55), m2 = v.P(0, R2 + 0.05), m3 = v.P(3.3, 0.55);
+  callout(m1[0], m1[1], m1[0] + 12, m1[1] - 48, '① input enters plate', { color: C.gold, alpha: ease(f, 436, 452) });
+  callout(m2[0], m2[1], m2[0] + 36, m2[1] + 28, '② annulus steers flux (control: κ_θ ≫ κ_r)', { color: C.violet, alpha: ease(f, 452, 468) });
+  callout(m3[0], m3[1], m3[0] - 12, m3[1] - 48, '③ output leaves to sink', { color: C.sink, alpha: ease(f, 468, 484) });
+  text(W - 28, 614, 'steady state: ∇·q = 0 ⇒ Q_in = Q_out · no storage, no generation', { size: 11.5, color: C.dim, align: 'right', bg: CARD_BG, alpha: ease(f, 480, 496) });
+  text(28, 614, 'tracer marks path order, not speed', { size: 11, color: C.dim, alpha: aF });
+}
+
+/* Segment D: isotherms and flux in separate panels, oblique-flux inset */
+const PD = [1.45 * Math.cos(0.95), 1.45 * Math.sin(0.95)];
+function drawD(f) {
+  const mdl = IDEAL;
+  const top = 104, hgt = 494;
+  const rL = { x: 0, y: top, w: 640, h: hgt }, rR = { x: 640, y: top, w: 640, h: hgt };
+  const cam = { cx: 0, cy: 0, zoom: 98 };
+  const vL = makeView(rL, cam), vR = makeView(rR, cam);
+  const aIn = ease(f, 503, 520); // starts inside the dissolve window so the incoming scene carries the frame
+  drawAssembly(vL, { alpha: 0.55 * aIn }); drawAssembly(vR, { alpha: 0.55 * aIn });
+  ctx.save(); px(); ctx.globalAlpha *= aIn; ctx.fillStyle = 'rgba(255,255,255,0.14)'; ctx.fillRect(639.5, top + 14, 1, hgt - 28); ctx.restore();
+  const sweepX = lerp(WINDOW.x0 - 0.1, WINDOW.x1 + 0.1, ease(f, 526, 602));
+  drawIsotherms(vL, mdl, { alpha: aIn, sweepX });
+  drawFlux(vR, mdl, f, { alpha: aIn, frac: ease(f, 526, 602) });
+  // Panel headers are drawn after the fields so their backing boxes sit over the lines, not under them.
+  text(rL.x + 22, top + 22, 'ISOTHERMS · T = const', { size: 12, color: C.iso, bg: CARD_BG, alpha: aIn });
+  text(rR.x + 22, top + 22, 'HEAT FLUX · q = −κ∇T', { size: 12, color: C.cyan, bg: CARD_BG, alpha: aIn });
+  text(rL.x + 22, top + 44, 'graded anisotropic shell (transformation design, idealized)', { size: 10.5, color: C.dim, bg: CARD_BG, alpha: aIn });
+  text(rR.x + 22, top + 44, 'streamlines of q · seeded uniformly at the input', { size: 10.5, color: C.dim, bg: CARD_BG, alpha: aIn });
+  const aLab = ease(f, 560, 580);
+  const l1 = vL.P(1.35 * Math.cos(0.3), 1.35 * Math.sin(0.3));
+  callout(l1[0], l1[1], l1[0] + 70, l1[1] - 96, 'isotherms compress inside the shell', { color: C.iso, alpha: aLab });
+  const l2 = vL.P(-2.6, -1.45);
+  callout(l2[0], l2[1], l2[0] + 40, l2[1] + 30, 'exterior: straight, undisturbed (ideal)', { color: C.iso, alpha: ease(f, 574, 594) });
+  const l3 = vL.P(0, 0.2);
+  callout(l3[0], l3[1], l3[0] - 20, l3[1] + 150, 'core: uniform intermediate T · not cold', { color: C.iso, alpha: ease(f, 586, 604) });
+  const r1 = vR.P(0.9, R2 - 0.25);
+  callout(r1[0], r1[1], r1[0] - 70, r1[1] + 62, 'flux steered around the object', { color: C.cyan, alpha: aLab });
+  const r2 = vR.P(-0.2, -0.3);
+  callout(r2[0], r2[1], r2[0] + 30, r2[1] + 140, 'no flux enters the core (q_r→0 at R1)', { color: C.cyan, alpha: ease(f, 586, 604) });
+  // hot / cold orientation tags (strips sit outside the panel windows at this zoom)
+  for (const r of [rL, rR]) {
+    text(r.x + 22, r.y + 70, '◀ hot side · input', { size: 10.5, color: C.gold, bg: CARD_BG, alpha: aIn });
+    text(r.x + r.w - 22, r.y + 70, 'cold side · output ▶', { size: 10.5, color: C.sink, align: 'right', bg: CARD_BG, alpha: aIn });
+  }
+  // P markers
+  const aP = ease(f, 598, 612);
+  for (const vv of [vL, vR]) { const p = vv.P(PD[0], PD[1]); ctx.save(); px(); ctx.globalAlpha *= aP; ctx.strokeStyle = C.violet; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(p[0], p[1], 7, 0, TAU); ctx.stroke(); ctx.restore(); text(p[0] + 10, p[1] - 10, 'P', { size: 12, color: C.violet, alpha: aP }); }
+  // inset
+  const tI = ease(f, 604, 628);
+  if (tI > 0) {
+    const cx = 640, cy = 452, R = 124 * tI, ZOOM = 686;
+    ctx.save(); px(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.clip(); ctx.fillStyle = C.stage; ctx.fill();
+    const vi = makeView({ x: cx - R, y: cy - R, w: 2 * R, h: 2 * R }, { cx: PD[0], cy: PD[1], zoom: ZOOM * tI });
+    drawAssembly(vi, { alpha: 0.9 });
+    const TP = field(mdl, PD[0], PD[1]).T; const lv = []; for (let k = -3; k <= 3; k++) lv.push(TP + k * 0.09);
+    drawIsotherms(vi, mdl, { alpha: 1, levels: lv, cell: 4, width: 1.2 });
+    const g = gradT(mdl, PD[0], PD[1]); const q = field(mdl, PD[0], PD[1]);
+    const gn = Math.hypot(g[0], g[1]), qn = Math.hypot(q.qx, q.qy);
+    const ng = [-g[0] / gn, -g[1] / gn], uq = [q.qx / qn, q.qy / qn];
+    const p0 = vi.P(PD[0], PD[1]); const Lp = 86 * tI;
+    const aArr = ease(f, 622, 640), aQ = ease(f, 640, 658);
+    arrow(p0[0], p0[1], p0[0] + Lp * ng[0], p0[1] - Lp * ng[1], { color: C.violet, width: 2.6, alpha: aArr });
+    arrow(p0[0], p0[1], p0[0] + Lp * uq[0], p0[1] - Lp * uq[1], { color: C.cyan, width: 2.6, alpha: aQ });
+    // angle arc
+    const phi = Math.acos(clamp(ng[0] * uq[0] + ng[1] * uq[1], -1, 1));
+    const aAng = ease(f, 656, 674);
+    if (aAng > 0) {
+      const a0 = Math.atan2(-ng[1], ng[0]), a1 = Math.atan2(-uq[1], uq[0]);
+      let d = a1 - a0; while (d > Math.PI) d -= TAU; while (d < -Math.PI) d += TAU;
+      ctx.save(); ctx.globalAlpha *= aAng; ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.6; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.arc(p0[0], p0[1], 34, a0, a0 + d, d < 0); ctx.stroke(); ctx.restore();
+      const am = a0 + d / 2; text(p0[0] + 48 * Math.cos(am), p0[1] + 48 * Math.sin(am), `φ ≈ ${fmt(phi * 180 / Math.PI, 0)}°`, { size: 12, color: C.text, align: 'center', bg: CARD_BG, alpha: aAng });
+    }
+    ctx.fillStyle = C.violet; ctx.beginPath(); ctx.arc(p0[0], p0[1], 3.5, 0, TAU); ctx.fill();
+    ctx.restore();
+    ctx.save(); px(); ctx.globalAlpha *= tI; ctx.strokeStyle = C.violet; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.stroke(); ctx.restore();
+    text(cx, cy - R - 12, `INSET at P · ×${fmt(ZOOM / cam.zoom, 0)} magnification · scale changed`, { size: 11, color: C.violet, align: 'center', bg: CARD_BG, alpha: tI });
+    text(cx - R - 12, cy - 30, '−∇T', { size: 12.5, color: C.violet, align: 'right', bg: CARD_BG, alpha: aArr });
+    text(cx - R - 12, cy - 10, 'normal to isotherm', { size: 10.5, color: C.dim, align: 'right', bg: CARD_BG, alpha: aArr });
+    text(cx + R + 12, cy - 30, 'q = −κ∇T', { size: 12.5, color: C.cyan, bg: CARD_BG, alpha: aQ });
+    text(cx + R + 12, cy - 10, 'rotated toward θ̂ by κ_θ ≫ κ_r', { size: 10.5, color: C.dim, bg: CARD_BG, alpha: aQ });
+    text(cx, cy + R + 14, 'φ is a model quantity at P (2D steady analytic field), not a measurement · isotropic limit: φ = 0', { size: 10.5, color: C.dim, align: 'center', bg: CARD_BG, alpha: aAng });
+  }
+}
+
+/* Segment E: three-case comparison, disturbance chart, limits */
+function drawE(f) {
+  const top = 104, hgt = 286, pw = 420, gap = 10;
+  const zoom = lerp(96, 46, ease(f, 750, 812));
+  const cases = [
+    { title: 'BARE OBJECT · no shell', sub: 'κ_c ≠ κ0, isotropic surroundings', mdl: shellModel(1), note: 'exterior isotherms bend: disturbance' },
+    { title: 'HOMOGENEOUS ANISOTROPIC SHELL', sub: `constant κ_r, κ_θ · ratio ${RATIO_MID} · √(κ_r κ_θ) = κ0 (model)`, mdl: shellModel(RATIO_MID), note: 'reduced, residual bending (model)' },
+    { title: 'GRADED ANISOTROPIC SHELL', sub: 'transformation design · κ_r→0, κ_θ→∞ at R1 (idealized)', mdl: IDEAL, note: 'undisturbed by construction (2D steady model)' },
+  ];
+  const aIn = ease(f, 743, 762), reveal = ease(f, 784, 850);
+  cases.forEach((cs, i) => {
+    const r = { x: i * (pw + gap), y: top, w: pw, h: hgt }; const v = makeView(r, { cx: 0, cy: 0, zoom });
+    ctx.save(); px(); ctx.globalAlpha *= aIn; ctx.fillStyle = 'rgba(17,24,39,0.35)'; roundRect(r.x, r.y, r.w, r.h, 8); ctx.fill(); ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.stroke(); ctx.restore();
+    drawAssembly(v, { alpha: 0.6 * aIn, layers: i === 0 ? 0 : N_LAYERS, core: 1, noShell: i === 0 });
+    drawReferenceIsotherms(v, { alpha: aIn * reveal });
+    drawFlux(v, cs.mdl, f, { alpha: 0.35 * aIn * reveal, width: 1, color: 'rgba(0,229,255,0.5)' });
+    drawIsotherms(v, cs.mdl, { alpha: aIn, sweepX: lerp(WINDOW.x0 - 0.1, WINDOW.x1 + 0.1, reveal), cell: 4.5 });
+    text(r.x + 14, r.y + 18, cs.title, { size: 11.5, color: C.text, bg: CARD_BG, alpha: aIn });
+    text(r.x + 14, r.y + 38, cs.sub, { size: 10, color: C.dim, bg: CARD_BG, alpha: aIn });
+    const np = v.P(-3.0, -0.9); callout(np[0], np[1], np[0] + 16, np[1] - 36, cs.note, { color: C.text, size: 11, alpha: ease(f, 850 + i * 12, 866 + i * 12) });
+    const Drel = Math.abs(cs.mdl.D) / (G * R1 * R1);
+    text(r.x + r.w - 14, r.y + r.h - 16, `|D|/(G R1²) = ${Drel < 1e-6 ? '0 (exact)' : Drel.toFixed(3)} · model`, { size: 10, color: C.dim, align: 'right', bg: CARD_BG, alpha: ease(f, 864 + i * 12, 880 + i * 12) });
+  });
+  // chart
+  const cx0 = 76, cy0 = 574, cw = 500, ch = 126, aC = ease(f, 796, 816);
+  if (aC > 0) {
+    card(28, 402, 596, 222, C.iso, aC);
+    text(48, 424, 'EXTERIOR DISTURBANCE vs ANISOTROPY RATIO · mathematical diagram, not measured', { size: 11, color: C.iso, alpha: aC });
+    ctx.save(); px(); ctx.globalAlpha *= aC; ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx0, cy0 - ch); ctx.lineTo(cx0, cy0); ctx.lineTo(cx0 + cw, cy0); ctx.stroke(); ctx.restore();
+    const xOf = a => cx0 + cw * Math.log10(a) / 2, yOf = d => cy0 - ch * d / 0.9;
+    const prog = ease(f, 812, 880), n = Math.max(2, Math.floor(CURVE.length * prog));
+    ctx.save(); px(); ctx.globalAlpha *= aC; ctx.strokeStyle = C.iso; ctx.lineWidth = 2; ctx.beginPath();
+    for (let i = 0; i < n; i++) { const [a, d] = CURVE[i]; i ? ctx.lineTo(xOf(a), yOf(d)) : ctx.moveTo(xOf(a), yOf(d)); } ctx.stroke();
+    ctx.setLineDash([3, 5]); ctx.strokeStyle = C.violet; ctx.beginPath(); ctx.moveTo(cx0, yOf(0)); ctx.lineTo(cx0 + cw, yOf(0)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.restore();
+    const aM = ease(f, 880, 896);
+    const mk = (a, label, dy) => { const d = Math.abs(shellModel(a).D) / (G * R1 * R1); const X = xOf(a), Y = yOf(d); ctx.save(); px(); ctx.globalAlpha *= aM; ctx.fillStyle = C.text; ctx.beginPath(); ctx.arc(X, Y, 4.5, 0, TAU); ctx.fill(); ctx.restore(); text(X + 10, Y + dy, label, { size: 11, color: C.text, bg: CARD_BG, alpha: aM }); };
+    mk(1, 'bare / isotropic', 12); mk(RATIO_MID, `homogeneous shell, ratio ${RATIO_MID}`, -14);
+    text(cx0 + cw, yOf(0) - 12, 'graded design → 0 by construction', { size: 11, color: C.violet, align: 'right', alpha: aM });
+    text(cx0, cy0 + 14, '1 (isotropic)', { size: 10.5, color: C.dim, alpha: aC }); text(cx0 + cw, cy0 + 14, '100', { size: 10.5, color: C.dim, align: 'right', alpha: aC });
+    text(cx0 + cw / 2, cy0 + 14, 'κ_θ/κ_r · log scale · model input', { size: 10.5, color: C.dim, align: 'center', alpha: aC });
+    text(cx0 + 8, cy0 - ch + 2, '|D| / (G R1²)  relative exterior dipole', { size: 10.5, color: C.dim, alpha: aC });
+    text(cx0 - 8, cy0, '0', { size: 10.5, color: C.dim, align: 'right', alpha: aC });
+    text(48, 608, `R2/R1 = ${R2 / R1} · κ_c = ${KC} κ0 · √(κ_r κ_θ) = κ0 · 2D steady analytic · no error bars (no measured data)`, { size: 9.5, color: C.dim, alpha: aC });
+  }
+  // limits card
+  const aL = ease(f, 840, 858);
+  if (aL > 0) {
+    const x = 640, y = 402, w = 612, h = 222; card(x, y, w, h, C.gold, aL);
+    text(x + 20, y + 22, 'LIMITS · LOSSES · ACCOUNTING  (retained on screen)', { size: 11, color: C.gold, alpha: aL });
+    const res = closedLoopResidual(shellModel(RATIO_MID));
+    const lines = [
+      'Steady state only. Transient response not shown.',
+      'Core: uniform intermediate T in the ideal design. Not a cold core.',
+      'Thermal conduction only. No optical invisibility.',
+      'Ideal graded κ is not realizable; layered builds leave residual exterior distortion.',
+      'Not modeled: contact resistance, finite layer count, 3D leakage, convection, radiation.',
+      'Plate outline is a drawing window; model is an infinite 2D plane. Schematic, not to scale.',
+      `Energy: ∇·q = 0. Closed-loop net flux residual ${res.toExponential(1)} (quadrature only) → Q_in = Q_out.`,
+    ];
+    lines.forEach((s, i) => text(x + 20, y + 50 + i * 24, (i === 6 ? '∑ ' : '· ') + s, { font: BODY, size: 13, color: C.text, alpha: ease(f, 852 + i * 11, 864 + i * 11) }));
+  }
+}
+
+const SCENES = [drawA, drawB, drawC, drawD, drawE];
+
+/* ---- 9. Frame composition (pure function of frame index) ---- */
+const XF = 7; // crossfade half-width in frames
+function render(f) {
+  f = clamp(Math.round(Number(f) || 0), 0, LAST);
+  ctx = mainCtx; stageBackground();
+  const i = segIndex(f), nextStart = i < SEG.length - 1 ? SEG[i + 1].s : Infinity, curStart = SEG[i].s;
+  let pairs;
+  if (f >= nextStart - XF) { const a = smooth((f - (nextStart - XF)) / (2 * XF)); pairs = [[i, 1 - a], [i + 1, a]]; }
+  else if (i > 0 && f < curStart + XF) { const a = smooth((f - (curStart - XF)) / (2 * XF)); pairs = [[i - 1, 1 - a], [i, a]]; }
+  else pairs = [[i, 1]];
+  if (pairs.length === 1) { ctx = mainCtx; px(); SCENES[pairs[0][0]](f); }
+  else {
+    // Dissolve on a transparent mix layer with additive premultiplied blending: where both scenes paint the same
+    // pixels the result keeps full opacity (no mid-dissolve dimming); where only one paints it fades normally.
+    const [[kOut, aOut], [kIn, aIn]] = pairs;
+    for (const [c, k] of [[offA, kOut], [offB, kIn]]) { ctx = c.getContext('2d'); px(); ctx.clearRect(0, 0, W, H); SCENES[k](f); }
+    const mx = offMix.getContext('2d'); mx.setTransform(1, 0, 0, 1, 0, 0); mx.clearRect(0, 0, offMix.width, offMix.height);
+    mx.globalCompositeOperation = 'source-over'; mx.globalAlpha = aOut; mx.drawImage(offA, 0, 0);
+    mx.globalCompositeOperation = 'lighter'; mx.globalAlpha = aIn; mx.drawImage(offB, 0, 0);
+    mx.globalCompositeOperation = 'source-over'; mx.globalAlpha = 1;
+    ctx = mainCtx; ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(offMix, 0, 0); ctx.restore();
+  }
+  ctx = mainCtx; px(); hud(f);
+  return f;
+}
+
+/* ---- 10. Playback, controls, export ---- */
+const params = new URLSearchParams(location.search);
+const $ = id => document.getElementById(id);
+const scrub = $('scrub'), frameIn = $('frameIn'), tc = $('tc'), playBtn = $('play'), status = $('status'), loopBox = $('loop');
+let frame = 0, playing = false, t0 = 0, f0 = 0, raf = 0;
+function show(f) {
+  try { frame = render(f); }
+  catch (err) { // surface the failure instead of leaving a frozen or blank stage
+    playing = false; cancelAnimationFrame(raf); playBtn.textContent = 'Play'; playBtn.setAttribute('aria-pressed', 'false');
+    status.textContent = `render error at frame ${f}: ${err && err.message ? err.message : err}`; status.dataset.state = 'fail';
+    throw err;
+  }
+  scrub.value = frame; frameIn.value = frame;
+  tc.textContent = `f ${String(frame).padStart(4, '0')} / ${LAST} · ${fmt(frame / FPS)} s · ${SEG[segIndex(frame)].id}`;
+}
+function tick(now) {
+  if (!playing) return;
+  let f = f0 + Math.floor((now - t0) / 1000 * FPS);
+  if (f > LAST) { if (loopBox.checked) { f0 = 0; t0 = now; f = 0; } else { f = LAST; show(f); setPlaying(false); return; } }
+  if (f !== frame) show(f);
+  raf = requestAnimationFrame(tick);
+}
+function setPlaying(on) {
+  playing = on; playBtn.textContent = on ? 'Pause' : 'Play'; playBtn.setAttribute('aria-pressed', String(on));
+  if (on) { f0 = frame >= LAST ? 0 : frame; t0 = performance.now(); raf = requestAnimationFrame(tick); } else cancelAnimationFrame(raf);
+}
+function seek(f) { setPlaying(false); show(f); }
+playBtn.addEventListener('click', () => setPlaying(!playing));
+$('stepB').addEventListener('click', () => seek(frame - 1));
+$('stepF').addEventListener('click', () => seek(frame + 1));
+scrub.addEventListener('input', () => seek(+scrub.value));
+frameIn.addEventListener('change', () => seek(+frameIn.value));
+document.querySelectorAll('button.seg').forEach(b => b.addEventListener('click', () => { seek(SEG[+b.dataset.seg].s); }));
+if (params.get('loop') === '0') loopBox.checked = false;
+window.addEventListener('keydown', e => {
+  if (e.target && /INPUT|TEXTAREA|BUTTON/.test(e.target.tagName) && e.key !== ' ') return;
+  if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
+  else if (e.key === 'ArrowRight') seek(frame + (e.shiftKey ? 10 : 1));
+  else if (e.key === 'ArrowLeft') seek(frame - (e.shiftKey ? 10 : 1));
+  else if (e.key === 'Home') seek(0); else if (e.key === 'End') seek(LAST);
+  else if (/^[1-5]$/.test(e.key)) seek(SEG[+e.key - 1].s);
+});
+window.addEventListener('resize', () => { fit(); dotPattern = null; show(frame); });
+
+/* Preview render: steps every frame through MediaRecorder. Timing is wall-clock, so treat the file as a preview;
+   for frame-exact output capture ?frame=N headlessly (see README). */
+$('export').addEventListener('click', async () => {
+  if (!canvas.captureStream || !window.MediaRecorder) { status.textContent = 'MediaRecorder is not available in this browser. Use ?frame=N headless capture instead.'; status.dataset.state = 'fail'; return; }
+  setPlaying(false);
+  const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find(m => MediaRecorder.isTypeSupported(m));
+  if (!mime) { status.textContent = 'No WebM encoder available.'; status.dataset.state = 'fail'; return; }
+  const stream = canvas.captureStream(0), track = stream.getVideoTracks()[0];
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 12_000_000 }); const chunks = [];
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  const done = new Promise(res => { rec.onstop = res; });
+  rec.start(); status.dataset.state = '';
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  for (let f = 0; f <= LAST; f++) {
+    show(f); if (track.requestFrame) track.requestFrame();
+    if (f % 30 === 0) status.textContent = `rendering preview… frame ${f} / ${LAST}`;
+    await wait(1000 / FPS);
+  }
+  await wait(120); rec.stop(); await done;
+  const blob = new Blob(chunks, { type: mime }); const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'anisotropic-thermal-flux-map-1020f-30fps-preview.webm'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  status.textContent = `preview WebM saved (${(blob.size / 1e6).toFixed(1)} MB, ${mime}). Wall-clock timing; not frame-exact.`;
+});
+
+/* Public, read-only automation surface. */
+window.__explainer = Object.freeze({ FPS, TOTAL, LAST, SEG: SEG.map(s => ({ ...s })), render: f => { seek(f); return frame; }, isReducedMotion: REDUCED });
+
+/* Boot */
+const pf = params.get('frame');
+if (pf != null && pf !== '') { seek(+pf); document.documentElement.dataset.static = '1'; }
+else { show(0); const auto = params.get('autoplay'); if (!REDUCED && auto !== '0') setPlaying(true); else if (REDUCED) status.textContent = 'Reduced motion detected: autoplay off, dash motion held still. Scrub or press Play.'; }
+})();
+</script>
+</body>
+</html>
