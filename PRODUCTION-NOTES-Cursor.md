@@ -128,6 +128,7 @@ Pre-deploy gate (`preflight-security`) applies to Hostinger estate deploys. This
 index.html                       the explainer (reserved filename for Pages)
 README.md                        overview, run, export, model, evidence grades, reference
 PRODUCTION-NOTES-Cursor.md       this file
+MEDIUM-ARTICLE-Cursor.md         companion long-form article with Medium SEO package appendix
 publish-Cursor.sh                create repo, push main + gh-pages, enable Pages, set About/topics
 tools/capture-frames-Cursor.mjs  frame-exact PNG capture over DevTools (Node 22+, Chrome)
 .nojekyll                        disables Jekyll processing on Pages

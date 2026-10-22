@@ -5,6 +5,7 @@ Code-driven, anatomy-style motion explainer of how an anisotropic conduction ann
 - Duration 34 s, 30 fps, 1,020 frames indexed 0–1019. Every frame is a pure function of its index.
 - Physics: 2D steady-state analytic conduction (core, anisotropic shell, background). Qualitative and labeled as such on every frame.
 - Live page: [mizcausevic-dev.github.io/anisotropic-thermal-flux-map](https://mizcausevic-dev.github.io/anisotropic-thermal-flux-map/), served from the `gh-pages` branch (see Publish).
+- Companion article: `MEDIUM-ARTICLE-Cursor.md` (physics, design decisions, safeguards, and a Medium SEO package in the appendix).
 
 ## Run
 
